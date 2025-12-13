@@ -15,12 +15,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 DB_PATH = Path("data/clean/ethnicity_clean.duckdb")
-MODEL_NAME = "allenai/OLMo-1B-hf" # using this model because of size
-
-
+MODEL_NAME = "allenai/OLMo-1B-hf"  # using this model because of data and size
 
 def build_pseudodoc(row, k=15):
-    """ collecting the top verbs and adjs  """
+    """collecting the top verbs and adjs"""
     terms = set()
 
     adj = row.get("Top Adjs Log-Odds", {})
@@ -34,21 +32,28 @@ def build_pseudodoc(row, k=15):
     return " ".join(sorted(terms))
 
 
-def add_pseudodocs(df, k=15):
-    """"creatina a doc with k top items"""
+def add_pseudodocs(df, k=20):
+    """ "creatina a doc with k top items"""
     df = df.copy()
     df["pseudodoc"] = df.apply(build_pseudodoc, axis=1, k=k)
     return df
 
 
 def embed_texts_olmo(texts: List[str], device=None):
-    """ loading in allen ai-s olmo """
+    """loading in allen ai-s olmo"""
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True,)
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_NAME,
+        trust_remote_code=True,
+    )
 
-    model = OlmoModel.from_pretrained(MODEL_NAME, trust_remote_code=True, output_hidden_states=False,).to(device)
+    model = OlmoModel.from_pretrained(
+        MODEL_NAME,
+        trust_remote_code=True,
+        output_hidden_states=False,
+    ).to(device)
 
     model.eval()
 
@@ -56,7 +61,7 @@ def embed_texts_olmo(texts: List[str], device=None):
 
     with torch.no_grad():
         for text in texts:
-            
+
             inputs = tokenizer(
                 text,
                 return_tensors="pt",
@@ -86,14 +91,13 @@ def compute_embeddings(df):
 
 
 def cosine_drift(a, b):
-    return 1 - cosine_similarity(
-        np.array([a]),
-        np.array([b]),
-    )[0][0]
+    """calculating the cosine similarity"""
+    similarity = cosine_similarity(np.array([a]), np.array([b]))
+    return (1 - similarity)[0][0]
 
 
 def compute_semantic_drift(df):
-    """using """
+    """using"""
     df = df.copy()
 
     lookup = {
@@ -124,8 +128,6 @@ def compute_semantic_drift(df):
     df["semantic_drift_race"] = drift_race
 
     return df
-
-
 
 
 def main():

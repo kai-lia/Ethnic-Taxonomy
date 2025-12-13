@@ -59,6 +59,7 @@ def compute_entropy_by_node(
 
 
 def infer_taxonomy_level(row):
+    
     if pd.isna(row["Race"]) and pd.isna(row["Region"]):
         return "Race"
     if pd.notna(row["Race"]) and pd.isna(row["Region"]):
@@ -68,6 +69,7 @@ def infer_taxonomy_level(row):
 
 
 def visualize_entropy(summary):
+    """" not creatign a  separate moduel because it is only one function"""
     order = ["Race", "Region", "Ethnicity"]
     summary = summary.set_index("level").loc[order].reset_index()
 
