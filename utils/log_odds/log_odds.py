@@ -33,6 +33,21 @@ def combine_counts(ethnicity_df, col):
     print(f"global {col} counter created with {len(merged)} unique {col}")
     return merged
 
+def top_k_log_odds_terms(log_odds_dict, k=20, min_score=0.0):
+    """return top-k terms with log-odds >= min_score"""
+    if not isinstance(log_odds_dict, dict):
+        return {}
+
+    items = [
+        (term, score)
+        for term, score in log_odds_dict.items()
+        if score >= min_score
+    ]
+
+    items = sorted(items, key=lambda x: x[1], reverse=True)[:k]
+
+    return dict(items)
+
 
 def weighted_log_odds(counts_group, counts_global, alpha=0.01):
     """ Monroe et al. 2008 weighted log-odds with Dirichlet prior:
@@ -85,8 +100,14 @@ if __name__ == "__main__":
     global_verb_counter = combine_counts(ethnicity_df, "Verbs") # creating verb global
     global_adj_counter = combine_counts(ethnicity_df, "Adjs") # creating adj global
 
+    # getting regular log odds
     ethnicity_df['Verbs Log-Odds'] = ethnicity_df['Verbs'].apply(lambda x: weighted_log_odds(x, global_verb_counter))
     ethnicity_df['Adjs Log-Odds'] = ethnicity_df['Adjs'].apply(lambda x: weighted_log_odds(x, global_adj_counter))
+
+    # top words for each ethnicity, a
+    ethnicity_df["Top Adjs Log-Odds"] = ethnicity_df["Adjs Log-Odds"].apply(lambda x: top_k_log_odds_terms(x))
+    ethnicity_df["Top Verbs Log-Odds"] = ethnicity_df["Verbs Log-Odds"].apply(lambda x: top_k_log_odds_terms(x))
+
     
     save_duck_df(DB_PATH, ethnicity_df, "ethnicity_log_odds")
 

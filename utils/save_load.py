@@ -29,7 +29,9 @@ def save_duck_df(path, df, name):
         "Verbs",
         "Nouns",
         "Adjs Log-Odds",
-        "Verbs Log-Odds",
+        "Verbs Log-Odds", 
+        "Top Adjs Log-Odds",
+        "Top Verbs Log-Odds",
     ] # all
 
     for col in counter_like_cols:
