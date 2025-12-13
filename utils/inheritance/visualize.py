@@ -1,11 +1,10 @@
-# utils/inheritance/visualization.py
-# for running chech run_inheritance.py
-
 from pathlib import Path
 import matplotlib.pyplot as plt
 
 
 def plot_by_parent(df, parent_col, mean_cols, lo_cols, hi_cols, out_dir, title_prefix):
+    """creates a side by side plot of inheritance level
+    left,"""
     Path(out_dir).mkdir(parents=True, exist_ok=True)
 
     for parent, sub in df.groupby(parent_col):
@@ -64,8 +63,8 @@ def plot_two_panel_inheritance(
 
         # adjectives
         ax = axes[0]
-        ax.hlines(y, sub[adj_cols[1]], sub[adj_cols[2]], alpha=0.5)
-        ax.scatter(sub[adj_cols[0]], y, zorder=3)
+        ax.hlines(y, sub[adj_cols[1]], sub[adj_cols[2]], color="tab:blue", alpha=0.5)
+        ax.scatter(sub[adj_cols[0]], y, zorder=3, color="tab:blue")
         ax.set_title("Adjective inheritance")
         ax.set_xlabel("Inheritance")
         ax.set_yticks(y)
@@ -73,8 +72,10 @@ def plot_two_panel_inheritance(
 
         # verbs
         ax = axes[1]
-        ax.hlines(y, sub[verb_cols[1]], sub[verb_cols[2]], alpha=0.5)
-        ax.scatter(sub[verb_cols[0]], y, zorder=3)
+        ax.hlines(
+            y, sub[verb_cols[1]], sub[verb_cols[2]], color="tab:orange", alpha=0.5
+        )
+        ax.scatter(sub[verb_cols[0]], y, zorder=3, color="tab:orange")
         ax.set_title("Verb inheritance")
         ax.set_xlabel("Inheritance")
 

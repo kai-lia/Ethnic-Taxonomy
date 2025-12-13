@@ -1,28 +1,27 @@
-import pickle
+import ast
 import sys
+import pickle
+import duckdb
+import pandas as pd
+
 from pathlib import Path
 from collections import Counter
-import pandas as pd 
-import ast
-import duckdb
+from utils.save_load import fetch_duck_df, save_duck_df
 
-# setting to main 
+
+# setting path root for reading or writing data
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-
-from utils.save_load import fetch_duck_df, save_duck_df
-
-# paths to data
+# writing and saving paths
 PKL_PATH = Path("data/ethnicity_class/taxonomy_structure.pkl")
 DB_PATH = Path("data/input/ethnicity_pos.duckdb")
 OUT_DB_PATH = Path("data/clean/ethnicity_clean.duckdb")
 
-ETHNICITY_ALIAS = { # for the sake of another project these are separate in my data, am combining them
+ETHNICITY_ALIAS = {  # for the sake of another project these are separate in my data, am combining them
     "asian indian": "indian",
     "native hawaiian": "hawaiian",
 }
-
 
 
 def load_pickle(path):
@@ -31,51 +30,63 @@ def load_pickle(path):
         return pickle.load(f)
 
 
-def clean_ethnicity(df): 
-    """i formatted things as south_asian for tokenizing purposes"""
+def clean_ethnicity(df):
+    """formatting name and grouping together ethnicities"""
+
     def normalize_ethnicity(eth):
-        """ grouping hawaiian and native hawaiian + more"""
+        """grouping ethnicities ex: hawaiian and native hawaiian"""
         if not isinstance(eth, str):
             return eth
         eth = eth.lower().strip()
         return ETHNICITY_ALIAS.get(eth, eth)
-    
+
+    # I formatted things as south_asian for tokenizing purposes, cleaning to south asian
     df["ethnicity"] = df["ethnicity"].str.replace("_", " ", regex=False)
-    df["ethnicity"] = df["ethnicity"].apply(normalize_ethnicity) 
-    
+    df["ethnicity"] = df["ethnicity"].apply(normalize_ethnicity)
 
 
 def parse_list(x):
-    """input df saved the lists as strings, reverting to lists"""
-    if isinstance(x, list):
+    """input df saved the lists as strings, reverting to lists
+    input: list as string "[]"
+    output: actual list []
+    """
+    if isinstance(x, list):  # is list, ignore
         return x
-    if isinstance(x, str):
+    if isinstance(x, str):  # revert to list if not list
         try:
-            parsed = ast.literal_eval(x)
+            parsed = ast.literal_eval(x)  # takes list in string and makes into a list
             return parsed if isinstance(parsed, list) else []
         except Exception:
             return []
     return []
 
-def add_taxonomy(df): 
-    """ check out file cleaning_data/create_taxomomy.py for more details
-    adding lables for hierarical taxonomy"""
+
+def add_taxonomy(df):
+    """adding lables for hierarical taxonomy
+    add lable columns "Race", "Region"
+
+    taxonomy made in cleaning_data/create_taxomomy.py for more details
+    """
+
     def get_classification(eth, taxonomy_struct):
-        # if term is missing → None, None
+        # if term is missing ret None, None
         if eth not in taxonomy_struct:
             return None, None
 
         values = taxonomy_struct[eth]
 
         # values may be [] or shorter/longer lists
-        race  = values[0] if len(values) > 0 else None
+        race = values[0] if len(values) > 0 else None
         region = values[1] if len(values) > 1 else None
 
         return race, region
-    print("loading pikcle ")
-    taxonomy_structure = load_pickle(PKL_PATH) # checkout 
 
-    df[["Race", "Region"]] = df["Ethnicity"].apply(lambda x: pd.Series(get_classification(x, taxonomy_structure)))
+    print("loading pickle...")
+    taxonomy_structure = load_pickle(PKL_PATH)  # checkout
+
+    df[["Race", "Region"]] = df["Ethnicity"].apply(
+        lambda x: pd.Series(get_classification(x, taxonomy_structure))
+    )
     return df
 
 
@@ -86,59 +97,59 @@ def sanitize_token(t):
     return t
 
 
-
-    
-def format_to_counters(df): 
+def format_to_counters(df):
     """data base is currently very unstructured
-    input (sentance level parses): 
+    input (sentance level parses):
        ethnicity adjs        verbs                nouns   count    has_dup
        chinese["cool"]	  ["found", "win"]	  ["people"]	1	  False
 
-    out: 
-    	Ethnicity	Adjs	                  Verbs	                 Nouns	               Race	   Region
-	    chinese	   Counter("lovely": 5, ...) Counter("eat": 10, ...) Counter("kid": 10, ..) Asian  East Asian
+    out:
+        Ethnicity	Adjs	                  Verbs	                 Nouns	               Race	   Region
+            chinese	   Counter("lovely": 5, ...) Counter("eat": 10, ...) Counter("kid": 10, ..) Asian  East Asian
     """
     results = []
     # had some formating issues with str
-    clean_ethnicity(df) # remove whitespace
-    
-    df["adjs"]  = df["adjs"].apply(parse_list)
-    df["verbs"]  = df["verbs"].apply(parse_list)
-    df["nouns"]  = df["nouns"].apply(parse_list)
+    clean_ethnicity(df)  # remove whitespace
+
+    df["adjs"] = df["adjs"].apply(parse_list)
+    df["verbs"] = df["verbs"].apply(parse_list)
+    df["nouns"] = df["nouns"].apply(parse_list)
 
     for eth, group in df.groupby("ethnicity"):
-        print(eth)
         adj_counter = Counter()
         verb_counter = Counter()
         noun_counter = Counter()
 
         for _, row in group.iterrows():
-            c = row["count"] # some are duplicates
+            # statments are aggregated by count because they appear multiple times
+            row_count = row["count"]
 
             # add weighted adjective counts
             for adj in row["adjs"]:
-                adj_counter[sanitize_token(adj)] += c
+                adj_counter[sanitize_token(adj)] += row_count
 
-            #add weighted verb counts
+            # add weighted verb counts
             for verb in row["verbs"]:
-                verb_counter[sanitize_token(verb)] += c
+                verb_counter[sanitize_token(verb)] += row_count
 
             # add weighted noun counts
             for noun in row["nouns"]:
-                noun_counter[sanitize_token(noun)] += c
+                noun_counter[sanitize_token(noun)] += row_count
 
-        results.append({
-            "Ethnicity": eth,
-            "Adjs": adj_counter,
-            "Verbs": verb_counter,
-            "Nouns": noun_counter
-        })
+        results.append(
+            {
+                "Ethnicity": eth,
+                "Adjs": adj_counter,
+                "Verbs": verb_counter,
+                "Nouns": noun_counter,
+            }
+        )
     ethnicity_df = pd.DataFrame(results)
     return ethnicity_df
 
 
-def main(): 
-    
+def run():
+
     df = fetch_duck_df(DB_PATH, "ethnicity_sentence_modifiers")
 
     print("Formatting and Cleaning ...")
@@ -146,11 +157,9 @@ def main():
     print("Adding Taxonomy ...")
     ethnicity_df = add_taxonomy(ethnicity_df)
 
-
     save_duck_df(OUT_DB_PATH, ethnicity_df, "ethnicity_clean")
 
 
 if __name__ == "__main__":
-    """ run via the command python -m utils.cleaning_data.clean_data"""
-    main()
-   
+    """run via the command python -m utils.cleaning_data.clean_data"""
+    run()

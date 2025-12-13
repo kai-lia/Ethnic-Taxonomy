@@ -3,54 +3,29 @@ from pathlib import Path
 
 from utils.save_load import fetch_duck_df, save_duck_df
 from utils.inheritance.inheritance import inheritance_with_bootstrap
-from utils.inheritance.visualization import (
+from utils.inheritance.visualize import (
     plot_by_parent,
     plot_two_panel_inheritance,
 )
 
+# for saving purposes
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 DB_PATH = Path("data/clean/ethnicity_clean.duckdb")
 
 
-def main():
+def run():
     df = fetch_duck_df(DB_PATH, "ethnicity_log_odds")
 
-    REQUIRED = {
-        "Top Adjs Log-Odds",
-        "Top Verbs Log-Odds",
-        "Region",
-        "Race",
-    }
-    assert REQUIRED.issubset(df.columns)
-
+    # calculate bootstap and inheritance
     inherit_df = inheritance_with_bootstrap(df, n_boot=1000)
 
+    # save for second part
     save_duck_df(
         DB_PATH,
         inherit_df,
         name="ethnicity_inheritance",
-    )
-
-    plot_by_parent(
-        inherit_df,
-        parent_col="Region",
-        mean_cols=["adj_region_mean", "verb_region_mean"],
-        lo_cols=["adj_region_lo", "verb_region_lo"],
-        hi_cols=["adj_region_hi", "verb_region_hi"],
-        out_dir="figures/regions",
-        title_prefix="Region Level Inheritance",
-    )
-
-    plot_by_parent(
-        inherit_df,
-        parent_col="Race",
-        mean_cols=["adj_race_mean", "verb_race_mean"],
-        lo_cols=["adj_race_lo", "verb_race_lo"],
-        hi_cols=["adj_race_hi", "verb_race_hi"],
-        out_dir="figures/races",
-        title_prefix="Race Level Inheritance",
     )
 
     plot_two_panel_inheritance(
@@ -73,4 +48,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    """python -m utils.inheritance.run_inheritance"""
+    run()

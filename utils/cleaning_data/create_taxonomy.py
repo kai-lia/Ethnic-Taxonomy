@@ -1,43 +1,42 @@
-import pickle
 import sys
+import pickle
+
 from pathlib import Path
 
+# setting path root for reading or writing data
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-output_path = Path("data/ethnicity_class/taxonomy_structure.pkl")
+OUTPUT_PATH = Path("data/ethnicity_class/taxonomy_structure.pkl")
 
 
-# hand creatied the taxonomy structure that my data will map to 
+# hand created the taxonomy structure that my data will map to
 # based on general demographic info, cited in writeup
-ethnicity_classification = {
-    #greater terms
-    "asian" : [],
+# using this format for future maping
+ETHNICITY_CLASSIFICATION = {
+    # greater terms
+    "asian": [],
     "asian american": [],
     "asian american pacific islander": [],
     "aapi": [],
     "pacific islander": [],
-
     # high level asia
     "south asian": ["asian"],
     "east asian": ["asian"],
     "central asian": ["asian"],
     "southeast asian": ["asian"],
     "western asian": ["asian"],
-
-    #pacific islander
+    # pacific islander
     "melanesian": ["pacific islander"],
     "micronesian": ["pacific islander"],
     "polynesian": ["pacific islander"],
-
-    #east asian
+    # east asian
     "chinese": ["asian", "east asian"],
     "korean": ["asian", "east asian"],
     "japanese": ["asian", "east asian"],
     "mongolian": ["asian", "east asian"],
     "taiwanese": ["asian", "east asian"],
-
-    #south asian
+    # south asian
     "indian": ["asian", "south asian"],
     "bangladeshi": ["asian", "south asian"],
     "nepalese": ["asian", "south asian"],
@@ -47,14 +46,12 @@ ethnicity_classification = {
     "afghan": ["asian", "south asian"],
     "sikh": ["asian", "south asian"],
     "asian indian": ["asian", "south asian"],
-
     # central asian
     "kazakh": ["asian", "central asian"],
     "kyrgyz": ["asian", "central asian"],
     "tajik": ["asian", "central asian"],
     "uzbek": ["asian", "central asian"],
-
-    #southeast asian
+    # southeast asian
     "indonesian": ["asian", "southeast asian"],
     "malaysian": ["asian", "southeast asian"],
     "filipino": ["asian", "southeast asian"],
@@ -66,29 +63,25 @@ ethnicity_classification = {
     "mien": ["asian", "southeast asian"],
     "cambodian": ["asian", "southeast asian"],
     "burmese": ["asian", "southeast asian"],
-
-    #polynesian
+    # polynesian
     "hawaiian": ["pacific islander", "polynesian"],
     "native hawaiian": ["pacific islander", "polynesian"],
     "maori": ["pacific islander", "polynesian"],
     "samoan": ["pacific islander", "polynesian"],
     "tahitian": ["pacific islander", "polynesian"],
     "tongan": ["pacific islander", "polynesian"],
-
-    #micornesean
+    # micornesean
     "chamorro": ["pacific islander", "micronesian"],
     "palauan": ["pacific islander", "micronesian"],
     "guamanian": ["pacific islander", "micronesian"],
     "marshallese": ["pacific islander", "micronesian"],
     "chuukese": ["pacific islander", "micronesian"],
-
-    #melinensian
-    "fijian": ["pacific islander", "melanesian"]
-
+    # melinensian
+    "fijian": ["pacific islander", "melanesian"],
 }
 
-# save file
-with open(output_path, "wb") as f:
-    pickle.dump(ethnicity_classification, f)
+# save file to a pickle for quick loading
+with open(OUTPUT_PATH, "wb") as f:
+    pickle.dump(ETHNICITY_CLASSIFICATION, f)
 
-print(f"ethnicity_classification saved to {output_path}")
+print(f"ethnicity_classification saved to {OUTPUT_PATH}")

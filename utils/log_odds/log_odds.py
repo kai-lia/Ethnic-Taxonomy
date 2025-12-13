@@ -1,20 +1,16 @@
-import pickle
 import sys
+import math
+import numpy as np
+
 from pathlib import Path
 from collections import Counter
 
-
-
-
-import numpy as np
-from collections import Counter
-import math
-
-from utils.cleaning_data.clean_data import main as cleaning_pipeline
+# from my code
+from utils.cleaning_data.clean_data import run as cleaning_pipeline
 from utils.save_load import fetch_duck_df, save_duck_df
 
 
-# setting to main 
+# setting to main
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
@@ -33,82 +29,100 @@ def combine_counts(ethnicity_df, col):
     print(f"global {col} counter created with {len(merged)} unique {col}")
     return merged
 
-def top_k_log_odds_terms(log_odds_dict, k=20, min_score=0.0):
-    """return top-k terms with log-odds >= min_score"""
+
+def top_k_log_odds_terms(log_odds_dict, k=0, min_score=0.0):
+    """return top-k terms with log-odds >= min_score
+    result: most distinct words per word group"""
     if not isinstance(log_odds_dict, dict):
         return {}
+    # sorting and getting the top terms of log odds
+    scores = np.array(list(log_odds_dict.values()))
+    median_score = np.median(scores)
 
     items = [
-        (term, score)
-        for term, score in log_odds_dict.items()
-        if score >= min_score
+        (term, score) for term, score in log_odds_dict.items() if score >= median_score
     ]
 
-    items = sorted(items, key=lambda x: x[1], reverse=True)[:k]
+    if k:
+        items = sorted(items, key=lambda x: x[1], reverse=True)[:k]
+    else:
+        items = sorted(items, key=lambda x: x[1], reverse=True)
 
     return dict(items)
 
 
-def weighted_log_odds(counts_group, counts_global, alpha=0.01):
-    """ Monroe et al. 2008 weighted log-odds with Dirichlet prior:
+def weighted_log_odds(group_counter, global_counter, alpha=0.01):
+    """Monroe et al. 2008 weighted log-odds with Dirichlet prior:
     counts_group: Counter of words in target group
     counts_global: Counter of words in all other groups
     """
 
-    vocab = set(counts_group)|set(counts_global)
+    vocab = set(group_counter) | set(global_counter)
     V = len(vocab)
 
     # totals
-    N1 = sum(counts_group.values())
-    N2 = sum(counts_global.values())
+    group_size = sum(group_counter.values())
+    global_size = sum(global_counter.values())
 
     # alpha prior: proportional to total frequency
-    alpha_vec = {w: alpha*counts_global.get(w, 0) for w in vocab}
-    A0 = sum(alpha_vec.values())
+    alpha_vec = {w: alpha * global_counter.get(w, 0) for w in vocab}
+    alpah_prior = sum(alpha_vec.values())
 
     scores = {}
 
-    for w in vocab:
-        c1 = counts_group.get(w, 0)
-        c2 = counts_global.get(w, 0)
+    for word in vocab:
+        # how many times word appears
+        group_word_count = group_counter.get(word, 0)  # word appearance # in group
+        global_word_count = global_counter.get(word, 0)  # word appearance # in global
 
         # posterior means
-        p1 = (c1 + alpha_vec[w]) / (N1 + A0)
-        p2 = (c2 + alpha_vec[w]) / (N2 + A0)
+        grp_prb = (group_word_count + alpha_vec[word]) / (group_size + alpah_prior)
+        glbl_prb = (global_word_count + alpha_vec[word]) / (global_size + alpah_prior)
 
         # weighted logodds
-        delta = np.log(p1 / (1 - p1)) - np.log(p2 / (1 - p2))
+        delta = np.log(grp_prb / (1 - grp_prb)) - np.log(glbl_prb / (1 - glbl_prb))
 
         # variance gets rid of rare words
-        var = 1/(c1 + alpha_vec[w]) + 1/(c2 + alpha_vec[w])
+        var = 1 / (group_word_count + alpha_vec[word]) + 1 / (
+            global_word_count + alpha_vec[word]
+        )
 
-        scores[w] = delta / math.sqrt(var)
+        scores[word] = delta / math.sqrt(var)
 
     return scores
 
 
-
-if __name__ == "__main__":
-    """ run via the command python -m utils.log_odds.log_odds"""
+def run():
     if not DB_PATH.exists():
         # making sure clean is there
         cleaning_pipeline()
 
-
     ethnicity_df = fetch_duck_df(DB_PATH, "ethnicity_clean")
 
-    global_verb_counter = combine_counts(ethnicity_df, "Verbs") # creating verb global
-    global_adj_counter = combine_counts(ethnicity_df, "Adjs") # creating adj global
+    # creating verb global, all verbs together
+    global_verb_counter = combine_counts(ethnicity_df, "Verbs")
+    # creating adj global, all adj together
+    global_adj_counter = combine_counts(ethnicity_df, "Adjs")
 
     # getting regular log odds
-    ethnicity_df['Verbs Log-Odds'] = ethnicity_df['Verbs'].apply(lambda x: weighted_log_odds(x, global_verb_counter))
-    ethnicity_df['Adjs Log-Odds'] = ethnicity_df['Adjs'].apply(lambda x: weighted_log_odds(x, global_adj_counter))
+    ethnicity_df["Verbs Log-Odds"] = ethnicity_df["Verbs"].apply(
+        lambda x: weighted_log_odds(x, global_verb_counter)
+    )
+    ethnicity_df["Adjs Log-Odds"] = ethnicity_df["Adjs"].apply(
+        lambda x: weighted_log_odds(x, global_adj_counter)
+    )
 
-    # top words for each ethnicity, a
-    ethnicity_df["Top Adjs Log-Odds"] = ethnicity_df["Adjs Log-Odds"].apply(lambda x: top_k_log_odds_terms(x))
-    ethnicity_df["Top Verbs Log-Odds"] = ethnicity_df["Verbs Log-Odds"].apply(lambda x: top_k_log_odds_terms(x))
+    # top words for each ethnicity from log odds
+    ethnicity_df["Top Adjs Log-Odds"] = ethnicity_df["Adjs Log-Odds"].apply(
+        lambda x: top_k_log_odds_terms(x, 50)
+    )
+    ethnicity_df["Top Verbs Log-Odds"] = ethnicity_df["Verbs Log-Odds"].apply(
+        lambda x: top_k_log_odds_terms(x, 50)
+    )
 
-    
     save_duck_df(DB_PATH, ethnicity_df, "ethnicity_log_odds")
 
-    
+
+if __name__ == "__main__":
+    """run via the command python -m utils.log_odds.log_odds"""
+    run()

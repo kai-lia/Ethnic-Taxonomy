@@ -1,20 +1,21 @@
-# utils/inheritance/inheritance.py
-
 import random
 import pandas as pd
 
 
 def bootstrap_inheritance(child_terms, parent_terms, n_boot=1000, seed=42):
-    """bootstrap overlap between child and parent signature sets"""
+    """bootstrap overlap between child and parent signature sets
+    caulaiting interval of uncertainty
+    output: mean, 1st quantile, 3rd quantial"""
     if not child_terms:
         return None, None, None
 
-    child_terms = list(child_terms)
-    parent_terms = set(parent_terms)
+    child_terms = list(child_terms)  # lower level on the taxonomy
+    parent_terms = set(parent_terms)  # higher level on the taxonomy
 
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # for consistency
     vals = []
 
+    # adding bootstrap
     for _ in range(n_boot):
         sample = [rng.choice(child_terms) for _ in range(len(child_terms))]
         vals.append(len(set(sample) & parent_terms) / len(sample))
@@ -24,12 +25,13 @@ def bootstrap_inheritance(child_terms, parent_terms, n_boot=1000, seed=42):
 
 
 def build_lookup(df, key="Ethnicity"):
-    """Row lookup by ethnicity label"""
+    """row lookup by ethnicity label"""
     return {row[key]: row for _, row in df.iterrows() if pd.notna(row[key])}
 
 
 def get_signature_terms(row):
-    """extract precomputed signature sets"""
+    """extract words most signature to the term
+    output: set of top log values"""
     adj = row.get("Top Adjs Log-Odds", {})
     verb = row.get("Top Verbs Log-Odds", {})
 
@@ -49,6 +51,11 @@ def unpack_stats(prefix, stats):
 
 
 def inheritance_with_bootstrap(df, n_boot=1000):
+    """
+    for the each of the taxonomy levels, perform bootstrap
+
+    out: new df with bootstrap values
+    """
     rows = []
     lookup = build_lookup(df)
 
@@ -59,21 +66,20 @@ def inheritance_with_bootstrap(df, n_boot=1000):
 
         child_terms = get_signature_terms(row)
 
-        # region-level inheritance
+        # region-level inheritance and boots
         if pd.notna(region) and region in lookup:
             parent_terms = get_signature_terms(lookup[region])
 
             adj_region = bootstrap_inheritance(
                 child_terms["adj"], parent_terms["adj"], n_boot
             )
-            
             verb_region = bootstrap_inheritance(
                 child_terms["verb"], parent_terms["verb"], n_boot
             )
         else:
             adj_region = verb_region = (None, None, None)
 
-        # race-level inheritance
+        # race-level inheritance and boots
         if pd.notna(race) and race in lookup:
             parent_terms = get_signature_terms(lookup[race])
             adj_race = bootstrap_inheritance(
